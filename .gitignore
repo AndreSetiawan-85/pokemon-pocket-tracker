@@ -36,3 +36,7 @@ yarn-error.log*
 AGENTS.md
 CLAUDE.md
 skills-lock.json
+
+# external repositories
+tcg-images/
+tcg-source/
