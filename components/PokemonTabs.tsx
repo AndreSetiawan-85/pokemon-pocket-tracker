@@ -111,7 +111,7 @@ export default function PokemonTabs({
         className="
           mt-8
           w-full
-          h-14
+          h-16
           rounded-lg
           border
           border-gray-300
