@@ -44,13 +44,11 @@ model Card {
 
   image     String?
 
-
   setName   String
 
   number    Int
 
   packName  String?
-
 
   pokemonId Int
 
