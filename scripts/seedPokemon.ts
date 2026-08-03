@@ -15,6 +15,49 @@ const prisma = new PrismaClient({
 
 
 
+function sleep(ms:number) {
+  return new Promise(
+    resolve => setTimeout(resolve, ms)
+  );
+}
+
+
+
+async function fetchJSON(url:string) {
+
+  for(let attempt = 1; attempt <= 3; attempt++) {
+
+    const response = await fetch(url);
+
+
+    if(response.ok) {
+
+      return await response.json();
+
+    }
+
+
+    console.log(
+      "Retry",
+      attempt,
+      response.status,
+      url
+    );
+
+
+    await sleep(1000);
+
+  }
+
+
+  throw new Error(
+    `Failed fetching ${url}`
+  );
+
+}
+
+
+
 function capitalize(text:string) {
 
   return text
@@ -64,10 +107,7 @@ function getRegion(generation:string) {
   };
 
 
-  return (
-    regions[generation]
-    ?? null
-  );
+  return regions[generation] ?? null;
 
 }
 
@@ -75,14 +115,8 @@ function getRegion(generation:string) {
 
 async function getEvolutionChain(url:string) {
 
-
-  const response =
-    await fetch(url);
-
-
   const data =
-    await response.json();
-
+    await fetchJSON(url);
 
 
   const names:string[] = [];
@@ -104,7 +138,7 @@ async function getEvolutionChain(url:string) {
 
 
     for(
-      const next of node.evolves_to
+      const next of node.evolves_to ?? []
     ) {
 
       walk(next);
@@ -116,7 +150,6 @@ async function getEvolutionChain(url:string) {
 
 
   walk(data.chain);
-
 
 
   return names.join(
@@ -145,15 +178,10 @@ async function main() {
 
 
 
-  const response =
-    await fetch(
+  const data =
+    await fetchJSON(
       "https://pokeapi.co/api/v2/pokemon?limit=1025"
     );
-
-
-
-  const data =
-    await response.json();
 
 
 
@@ -166,162 +194,168 @@ async function main() {
   ) {
 
 
-    const detailResponse =
-      await fetch(
-        item.url
-      );
+    try {
 
 
-    const detail =
-      await detailResponse.json();
+      const detail =
+        await fetchJSON(
+          item.url
+        );
 
 
-
-    const speciesResponse =
-      await fetch(
-        `https://pokeapi.co/api/v2/pokemon-species/${detail.id}`
-      );
-
-
-    const species =
-      await speciesResponse.json();
+      await sleep(100);
 
 
 
-    const evolution =
-      await getEvolutionChain(
-        species.evolution_chain.url
-      );
+      const species =
+        await fetchJSON(
+          `https://pokeapi.co/api/v2/pokemon-species/${detail.id}`
+        );
+
+
+      await sleep(100);
 
 
 
-    const types =
-      detail.types.map(
-        (t:any) =>
-          capitalize(
-            t.type.name
-          )
-      );
+      const evolution =
+        await getEvolutionChain(
+          species.evolution_chain.url
+        );
+
+
+      await sleep(100);
 
 
 
-    const abilities =
-      detail.abilities.map(
-        (a:any) =>
-          capitalize(
-            a.ability.name
-          )
-      );
+      const types =
+        detail.types.map(
+          (t:any) =>
+            capitalize(
+              t.type.name
+            )
+        );
 
 
 
-    const category =
-      species.genera.find(
-        (g:any) =>
-          g.language.name === "en"
-      )?.genus
-      ?? null;
+      const abilities =
+        detail.abilities.map(
+          (a:any) =>
+            capitalize(
+              a.ability.name
+            )
+        );
 
 
 
-    const description =
-      species.flavor_text_entries.find(
-        (f:any) =>
-          f.language.name === "en"
-      )
-      ?.flavor_text
-      ?.replace(/\n/g," ")
-      ?.replace(/\f/g," ")
-      ??
-      null;
+      const category =
+        species.genera.find(
+          (g:any) =>
+            g.language.name === "en"
+        )?.genus
+        ?? null;
 
 
 
-    await prisma.pokemon.create({
-
-      data: {
-
-        id:
-          detail.id,
-
-
-        name:
-          capitalize(
-            detail.name
-          ),
-
-
-        image:
-          detail
-            .sprites
-            .other[
-              "official-artwork"
-            ]
-            .front_default,
+      const description =
+        species.flavor_text_entries.find(
+          (f:any) =>
+            f.language.name === "en"
+        )
+        ?.flavor_text
+        ?.replace(/\n/g," ")
+        ?.replace(/\f/g," ")
+        ?? null;
 
 
 
-        types,
+      await prisma.pokemon.create({
+
+        data: {
+
+          id:
+            detail.id,
 
 
-        region:
-          getRegion(
-            species.generation.name
-          ),
+          name:
+            capitalize(
+              detail.name
+            ),
+
+
+          image:
+            detail
+              .sprites
+              .other[
+                "official-artwork"
+              ]
+              .front_default,
+
+
+          types,
+
+
+          region:
+            getRegion(
+              species.generation.name
+            ),
+
+
+          generation:
+            capitalize(
+              species.generation.name
+            ),
+
+
+          category,
+
+
+          evolution,
+
+
+          height:
+            `${detail.height / 10} m`,
+
+
+          weight:
+            `${detail.weight / 10} kg`,
+
+
+          ability:
+            abilities.join(
+              ", "
+            ),
+
+
+          description,
+
+
+        }
+
+      });
 
 
 
-        generation:
-          capitalize(
-            species.generation.name
-          ),
+      count++;
 
 
 
-        category,
+      if(count % 50 === 0) {
 
-
-        evolution,
-
-
-        height:
-          `${detail.height / 10} m`,
-
-
-
-        weight:
-          `${detail.weight / 10} kg`,
-
-
-
-        ability:
-          abilities.join(
-            ", "
-          ),
-
-
-
-        description,
-
+        console.log(
+          "Imported",
+          count,
+          "Pokemon"
+        );
 
       }
 
-    });
 
-
-
-    count++;
-
-
-
-    if(
-      count % 50 === 0
-    ) {
+    } catch(error) {
 
       console.log(
-        "Imported",
-        count,
-        "Pokemon"
+        "FAILED:",
+        item.name,
+        error
       );
 
     }
@@ -332,6 +366,7 @@ async function main() {
 
 
   console.log("================");
+
   console.log(
     "Pokemon imported:",
     count
@@ -345,7 +380,7 @@ async function main() {
 main()
 
 .then(
-  async () => {
+  async()=>{
 
     await prisma.$disconnect();
 
