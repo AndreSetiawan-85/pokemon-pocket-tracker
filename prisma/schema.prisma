@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+model Pokemon {
+
+  id      Int    @id
+
+  name    String
+
+  image   String?
+
+
+  types       String[]
+  region      String?
+  generation  String?
+  category    String?
+  evolution   String?
+  height      String?
+  weight      String?
+  ability     String?
+  description String?
+
+
+  cards   Card[]
+
+}
+
+
+model Card {
+
+  id        Int    @id @default(autoincrement())
+
+  name      String
+
+  rarity    String?
+
+  image     String?
+
+
+  setName   String
+
+  number    Int
+
+  packName  String?
+
+
+  pokemonId Int
+
+  pokemon   Pokemon @relation(fields: [pokemonId], references: [id], onDelete: Cascade)
+
+}
